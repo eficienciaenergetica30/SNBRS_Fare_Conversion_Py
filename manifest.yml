@@ -1,0 +1,12 @@
+applications:
+  - name: carga-conversion-tarifas-py
+    memory: 1024M  # Aumentado de 512M (recomendado para procesar Excel)
+    buildpack: python_buildpack
+    command: gunicorn -w 4 app:app --bind 0.0.0.0:$PORT --timeout 120
+    health-check-type: http
+    health-check-http-endpoint: /
+    env:
+      FLASK_ENV: production
+      ENVIRONMENT: prd
+      PYTHONUNBUFFERED: "true"
+      HTTP_TIMEOUT: "120"

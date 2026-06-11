@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Carga Conversión de Tarifas</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .table thead th {
+            background-color: #e9ecef;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        #fabSave {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            z-index: 1050;
+        }
+
+        #btnDescarga {
+            position: fixed;
+            top: 28px;
+            right: 28px;
+            z-index: 1050;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid pt-4" style="max-width: 75%;">
+
+        <!-- Título -->
+        <div class="text-center mb-4">
+            <h1 class="fw-bold">Carga Conversión de Tarifas</h1>
+            <p class="text-muted">Carga un archivo Excel y visualiza la información</p>
+        </div>
+
+        <!-- Upload card -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center g-3">
+                    <div class="col-12 col-md">
+                        <input class="form-control" type="file" id="fileInput" accept=".xlsx,.xls" />
+                    </div>
+                    <div class="col-12 col-md-auto">
+                        <button class="btn btn-primary w-100" id="btnLoad" disabled>
+                            <span id="btnText">Mostrar información</span>
+                            <span id="loadSpinner" class="spinner-border spinner-border-sm ms-2 d-none"
+                                role="status"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error banner -->
+        <div class="alert alert-danger d-none" id="errorBanner"></div>
+
+        <!-- Table card -->
+        <div class="card d-none" id="tableCard">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover table-sm mb-0" id="dataTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div style="height: 80px;"></div>
+    </div>
+
+    <!-- Botón descarga plantilla (fijo, esquina inferior derecha) -->
+    <div id="btnDescarga">
+        <a href="/static/templates/Tarifas.xlsx" download="Template_Horarios_Tarifas.xlsx"
+            class="btn btn-outline-secondary shadow" title="Descargar plantilla Excel" data-bs-toggle="tooltip"
+            data-bs-placement="left" data-bs-title="Descargar plantilla">
+            📥 Plantilla
+        </a>
+    </div>
+
+    <!-- FAB Guardar -->
+    <div id="fabSave" class="d-none">
+        <button class="btn btn-success btn-lg shadow" id="btnSave">
+            💾 Guardar
+            <span id="saveSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        let parsedRows = [];
+
+        const fileInput = document.getElementById('fileInput');
+        const btnLoad = document.getElementById('btnLoad');
+        const btnText = document.getElementById('btnText');
+        const loadSpinner = document.getElementById('loadSpinner');
+        const errorBanner = document.getElementById('errorBanner');
+        const tableCard = document.getElementById('tableCard');
+        const tblHead = document.querySelector('#dataTable thead');
+        const tblBody = document.querySelector('#dataTable tbody');
+        const fabSave = document.getElementById('fabSave');
+        const btnSave = document.getElementById('btnSave');
+        const saveSpinner = document.getElementById('saveSpinner');
+
+        function showError(msg) {
+            errorBanner.textContent = msg;
+            errorBanner.classList.remove('d-none');
+        }
+
+        function hideError() {
+            errorBanner.classList.add('d-none');
+        }
+
+        function resetTable() {
+            tblHead.innerHTML = '';
+            tblBody.innerHTML = '';
+            tableCard.classList.add('d-none');
+            fabSave.classList.add('d-none');
+            parsedRows = [];
+            hideError();
+        }
+
+        function renderTable(header, rows) {
+            const tr = document.createElement('tr');
+            header.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col ?? '';
+                tr.appendChild(th);
+            });
+            tblHead.appendChild(tr);
+
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                row.forEach(val => {
+                    const td = document.createElement('td');
+                    td.textContent = val ?? '';
+                    tr.appendChild(td);
+                });
+                tblBody.appendChild(tr);
+            });
+
+            tableCard.classList.remove('d-none');
+            fabSave.classList.remove('d-none');
+        }
+
+        fileInput.addEventListener('change', () => {
+            resetTable();
+            btnLoad.disabled = !fileInput.files.length;
+        });
+
+        btnLoad.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            resetTable();
+            btnLoad.disabled = true;
+            btnText.textContent = 'Cargando...';
+            loadSpinner.classList.remove('d-none');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/preview', { method: 'POST', body: formData });
+                const json = await res.json();
+
+                if (!res.ok) {
+                    showError(json.error || 'Error al leer el archivo.');
+                    return;
+                }
+
+                parsedRows = json.rows;
+                renderTable(json.header, json.rows);
+
+            } catch (err) {
+                showError('Error de red al procesar el archivo.');
+                console.error(err);
+            } finally {
+                btnLoad.disabled = false;
+                btnText.textContent = 'Mostrar información';
+                loadSpinner.classList.add('d-none');
+            }
+        });
+
+        btnSave.addEventListener('click', async () => {
+            if (!parsedRows.length) return;
+
+            const result = await Swal.fire({
+                title: '¿Guardar registros?',
+                html: `Se insertarán <strong>${parsedRows.length}</strong> registros.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, guardar',
+                cancelButtonText: 'Cancelar',
+            });
+
+            if (!result.isConfirmed) return;
+
+            btnSave.disabled = true;
+            saveSpinner.classList.remove('d-none');
+
+            try {
+                const res = await fetch('/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rows: parsedRows }),
+                });
+                const json = await res.json();
+
+                if (!res.ok) {
+                    Swal.fire('Error', json.error || 'No se pudo guardar.', 'error');
+                } else {
+                    await Swal.fire('¡Listo!', json.message || 'Datos guardados correctamente.', 'success');
+                    location.reload();
+                }
+
+                if (!res.ok) {
+                    Swal.fire('Error', json.error || 'No se pudo guardar.', 'error');
+                } else {
+                    Swal.fire('¡Listo!', json.message || 'Datos guardados correctamente.', 'success')
+                        .then(() => location.reload());  // ← agrega esto
+                }
+
+            } catch (err) {
+                Swal.fire('Error', 'Error de red al guardar los datos.', 'error');
+                console.error(err);
+            } finally {
+                btnSave.disabled = false;
+                saveSpinner.classList.add('d-none');
+            }
+        });
+    </script>
+
+</body>
+
+</html>
