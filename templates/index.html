@@ -218,26 +218,26 @@
                 const res = await fetch('/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rows: parsedRows }),
+                    body: JSON.stringify({ 
+                        rows: parsedRows,
+                        rows_read: parsedRows.length // Enviamos el total leido
+                    }),
                 });
+                
                 const json = await res.json();
 
+                // res.ok valida si el status de Flask fue 200-299. Si Flask devuelve 500 o 400, res.ok es false.
                 if (!res.ok) {
-                    Swal.fire('Error', json.error || 'No se pudo guardar.', 'error');
-                } else {
-                    await Swal.fire('¡Listo!', json.message || 'Datos guardados correctamente.', 'success');
-                    location.reload();
-                }
-
-                if (!res.ok) {
-                    Swal.fire('Error', json.error || 'No se pudo guardar.', 'error');
+                    Swal.fire('Error', json.error || 'Ocurrió un error en el proceso.', 'error');
                 } else {
                     Swal.fire('¡Listo!', json.message || 'Datos guardados correctamente.', 'success')
-                        .then(() => location.reload());  // ← agrega esto
+                        .then(() => {
+                            location.reload(); 
+                        });
                 }
 
             } catch (err) {
-                Swal.fire('Error', 'Error de red al guardar los datos.', 'error');
+                Swal.fire('Error', 'Error de red al comunicarse con el servidor.', 'error');
                 console.error(err);
             } finally {
                 btnSave.disabled = false;
